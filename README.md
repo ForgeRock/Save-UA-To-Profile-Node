@@ -1,6 +1,6 @@
 <b>Save User Agent to Profile Authentication Node</b>
 <br/>
-A simple authentication node that stores a SHA256 hash of the requesting user-agent address to the users profile.
+A simple authentication node that stores a SHA256 hash of the requesting user-agent to the users profile.
 <br/>
 <br/>
 <b>Installation</b>
@@ -15,7 +15,7 @@ Deploy the node, and select which attribute you want to use to store the user ag
 <br/>
 <b>To Build</b>
 <br/>
-To rebuild, run "mvn clean install" in the directory containing the pom.xml
+To rebuild, run ./build.sh (or "mvn clean install") in the directory containing the pom.xml
 <br/>
 <br/>
 <br/>
