@@ -62,6 +62,12 @@ public class SaveUAToProfileNode extends SingleOutcomeNode {
         @Attribute(order = 100)
         String attribute();
 
+        //Toggle as to whether UA is stored in the clear or SHA256 hashed for privacy
+        @Attribute(order = 200)
+        default boolean storeAsHash() {
+            return false;
+        }
+
     }
 
     private final Config config;
@@ -83,50 +89,84 @@ public class SaveUAToProfileNode extends SingleOutcomeNode {
         String clientUA = context.request.headers.get("User-Agent").toString();
         debug.message("[" + DEBUG_FILE + "]: client user agent found as :" + clientUA);
 
-        //Create SHA256 of user agent
-        MessageDigest digest = null;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
+        if(config.storeAsHash()) {
+
+            //Create SHA256 of user agent
+            MessageDigest digest = null;
+            try {
+                digest = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
+            byte[] clientUAPHash = digest.digest(clientUA.getBytes(StandardCharsets.UTF_8));
+            StringBuffer hexString = new StringBuffer();
+
+            for (int i = 0; i < clientUAPHash.length; i++) {
+                String hex = Integer.toHexString(0xff & clientUAPHash[i]);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+
+            String uaAsHash = hexString.toString();
+            debug.message("[" + DEBUG_FILE + "]: hash of client user agent as : " + uaAsHash);
+
+            //Wrapper to access profile
+            AMIdentity userIdentity = coreWrapper.getIdentity(context.sharedState.get(USERNAME).asString(), context.sharedState.get(REALM).asString());
+
+
+            //Create payload that will be saved to profile
+            Map<String, Set> map = new HashMap<String, Set>();
+            Set<String> values = new HashSet<String>();
+            values.add(uaAsHash);
+            map.put(config.attribute(), values);
+
+            //Try and save against the user profile
+            try {
+
+                userIdentity.setAttributes(map);
+                userIdentity.store();
+
+            } catch (IdRepoException e) {
+
+                debug.error("[" + DEBUG_FILE + "]: " + " Error storing profile attribute '{}' ", e);
+
+            } catch (SSOException e) {
+
+                debug.error("[" + DEBUG_FILE + "]: " + "Node exception", e);
+
+            }
+
+        } else {
+
+            //Wrapper to access profile
+            AMIdentity userIdentity = coreWrapper.getIdentity(context.sharedState.get(USERNAME).asString(), context.sharedState.get(REALM).asString());
+
+
+            //Create payload that will be saved to profile
+            Map<String, Set> map = new HashMap<String, Set>();
+            Set<String> values = new HashSet<String>();
+            values.add(clientUA);
+            map.put(config.attribute(), values);
+
+            //Try and save against the user profile
+            try {
+
+                userIdentity.setAttributes(map);
+                userIdentity.store();
+
+            } catch (IdRepoException e) {
+
+                debug.error("[" + DEBUG_FILE + "]: " + " Error storing profile attribute '{}' ", e);
+
+            } catch (SSOException e) {
+
+                debug.error("[" + DEBUG_FILE + "]: " + "Node exception", e);
+
+            }
+
+
         }
-        byte[] clientUAPHash = digest.digest(clientUA.getBytes(StandardCharsets.UTF_8));
-        StringBuffer hexString = new StringBuffer();
 
-        for (int i = 0; i < clientUAPHash.length; i++) {
-            String hex = Integer.toHexString(0xff & clientUAPHash[i]);
-            if (hex.length() == 1) hexString.append('0');
-            hexString.append(hex);
-        }
-
-        String uaAsHash = hexString.toString();
-        debug.message("[" + DEBUG_FILE + "]: hash of client user agent as : " + uaAsHash);
-
-        //Wrapper to access profile
-        AMIdentity userIdentity = coreWrapper.getIdentity(context.sharedState.get(USERNAME).asString(), context.sharedState.get(REALM).asString());
-
-
-        //Create payload that will be saved to profile
-        Map<String, Set> map = new HashMap<String, Set>();
-        Set<String> values = new HashSet<String>();
-        values.add(uaAsHash);
-        map.put(config.attribute(), values);
-
-        //Try and save against the user profile
-        try {
-
-            userIdentity.setAttributes(map);
-            userIdentity.store();
-
-        } catch (IdRepoException e) {
-
-            debug.error("[" + DEBUG_FILE + "]: " + " Error storing profile attribute '{}' ", e);
-
-        } catch (SSOException e) {
-
-            debug.error("[" + DEBUG_FILE + "]: " + "Node exception", e);
-
-        }
 
 
         return goToNext().build();
